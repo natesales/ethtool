@@ -56,13 +56,17 @@ const (
 	ETHTOOL_GSTRINGS = 0x0000001b /* get specified string set */
 	ETHTOOL_GSTATS   = 0x0000001d /* get NIC-specific statistics */
 	// other CMDs from ethtool-copy.h of ethtool-3.5 package
-	ETHTOOL_GSET      = 0x00000001 /* Get settings. */
-	ETHTOOL_SSET      = 0x00000002 /* Set settings. */
-	ETHTOOL_GMSGLVL   = 0x00000007 /* Get driver message level */
-	ETHTOOL_SMSGLVL   = 0x00000008 /* Set driver msg level. */
-	ETHTOOL_GCHANNELS = 0x0000003c /* Get no of channels */
-	ETHTOOL_SCHANNELS = 0x0000003d /* Set no of channels */
-	ETHTOOL_GCOALESCE = 0x0000000e /* Get coalesce config */
+	ETHTOOL_GSET        = 0x00000001 /* Get settings. */
+	ETHTOOL_SSET        = 0x00000002 /* Set settings. */
+	ETHTOOL_GMSGLVL     = 0x00000007 /* Get driver message level */
+	ETHTOOL_SMSGLVL     = 0x00000008 /* Set driver msg level. */
+	ETHTOOL_GCHANNELS   = 0x0000003c /* Get no of channels */
+	ETHTOOL_SCHANNELS   = 0x0000003d /* Set no of channels */
+	ETHTOOL_GCOALESCE   = 0x0000000e /* Get coalesce config */
+	ETHTOOL_GRINGPARAM  = 0x00000010 /* Get ring parameters */
+	ETHTOOL_SRINGPARAM  = 0x00000011 /* Set ring parameters. */
+	ETHTOOL_GPAUSEPARAM = 0x00000012 /* Get pause parameters */
+	ETHTOOL_SPAUSEPARAM = 0x00000013 /* Set pause parameters. */
 	/* Get link status for host, i.e. whether the interface *and* the
 	 * physical port (if there is one) are up (ethtool_value). */
 	ETHTOOL_GLINK         = 0x0000000a
@@ -165,6 +169,27 @@ type Channels struct {
 	TxCount       uint32
 	OtherCount    uint32
 	CombinedCount uint32
+}
+
+// Rings contains the number of rings for a given interface
+type Rings struct {
+	Cmd               uint32
+	RXMaxPending      uint32
+	RXMiniMaxPending  uint32
+	RXJumboMaxPending uint32
+	TXMaxPending      uint32
+	RXPending         uint32
+	RXMiniPending     uint32
+	RXJumboPending    uint32
+	TXPending         uint32
+}
+
+// Pause is a pause config for an interface
+type Pause struct {
+	Cmd     uint32
+	Autoneg uint32
+	RXPause uint32
+	TXPause uint32
 }
 
 // Coalesce is a coalesce config for an interface
@@ -412,6 +437,48 @@ func (e *Ethtool) SetChannels(intf string, channels Channels) (Channels, error) 
 	return channels, nil
 }
 
+// GetRings returns the number of rings for the given interface name.
+func (e *Ethtool) GetRings(intf string) (Rings, error) {
+	rings, err := e.getRings(intf)
+	if err != nil {
+		return Rings{}, err
+	}
+
+	return rings, nil
+}
+
+// SetRings sets the number of rings for the given interface name and
+// returns the new number of rings.
+func (e *Ethtool) SetRings(intf string, rings Rings) (Rings, error) {
+	rings, err := e.setRings(intf, rings)
+	if err != nil {
+		return Rings{}, err
+	}
+
+	return rings, nil
+}
+
+// GetPause returns the pause config for the given interface name.
+func (e *Ethtool) GetPause(intf string) (Pause, error) {
+	pause, err := e.getPause(intf)
+	if err != nil {
+		return Pause{}, err
+	}
+
+	return pause, nil
+}
+
+// SetPause sets the pause config for the given interface name and
+// returns the new pause config.
+func (e *Ethtool) SetPause(intf string, pause Pause) (Pause, error) {
+	pause, err := e.setPause(intf, pause)
+	if err != nil {
+		return Pause{}, err
+	}
+
+	return pause, nil
+}
+
 // GetCoalesce returns the coalesce config for the given interface name.
 func (e *Ethtool) GetCoalesce(intf string) (Coalesce, error) {
 	coalesce, err := e.getCoalesce(intf)
@@ -502,6 +569,50 @@ func (e *Ethtool) setChannels(intf string, channels Channels) (Channels, error) 
 	}
 
 	return channels, nil
+}
+
+func (e *Ethtool) getRings(intf string) (Rings, error) {
+	rings := Rings{
+		Cmd: ETHTOOL_GRINGPARAM,
+	}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&rings))); err != nil {
+		return Rings{}, err
+	}
+
+	return rings, nil
+}
+
+func (e *Ethtool) setRings(intf string, rings Rings) (Rings, error) {
+	rings.Cmd = ETHTOOL_SRINGPARAM
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&rings))); err != nil {
+		return Rings{}, err
+	}
+
+	return rings, nil
+}
+
+func (e *Ethtool) getPause(intf string) (Pause, error) {
+	pause := Pause{
+		Cmd: ETHTOOL_GPAUSEPARAM,
+	}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&pause))); err != nil {
+		return Pause{}, err
+	}
+
+	return pause, nil
+}
+
+func (e *Ethtool) setPause(intf string, pause Pause) (Pause, error) {
+	pause.Cmd = ETHTOOL_SPAUSEPARAM
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&pause))); err != nil {
+		return Pause{}, err
+	}
+
+	return pause, nil
 }
 
 func (e *Ethtool) getCoalesce(intf string) (Coalesce, error) {
