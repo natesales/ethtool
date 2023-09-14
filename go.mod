@@ -1,4 +1,4 @@
-module github.com/safchain/ethtool
+module git.cloudsmash.io/cloudsmash/ethtool
 
 go 1.16
 
