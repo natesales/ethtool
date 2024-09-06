@@ -58,6 +58,8 @@ const (
 	// other CMDs from ethtool-copy.h of ethtool-3.5 package
 	ETHTOOL_GSET        = 0x00000001 /* Get settings. */
 	ETHTOOL_SSET        = 0x00000002 /* Set settings. */
+	ETHTOOL_GWOL        = 0x00000005 /* Get wake-on-lan options. */
+	ETHTOOL_SWOL        = 0x00000006 /* Set wake-on-lan options. */
 	ETHTOOL_GMSGLVL     = 0x00000007 /* Get driver message level */
 	ETHTOOL_SMSGLVL     = 0x00000008 /* Set driver msg level. */
 	ETHTOOL_GCHANNELS   = 0x0000003c /* Get no of channels */
@@ -217,6 +219,36 @@ type Coalesce struct {
 	TxCoalesceUsecsHigh      uint32
 	TxMaxCoalescedFramesHigh uint32
 	RateSampleInterval       uint32
+}
+
+// WoL options
+const (
+	WAKE_PHY         = 1 << 0
+	WAKE_UCAST       = 1 << 1
+	WAKE_MCAST       = 1 << 2
+	WAKE_BCAST       = 1 << 3
+	WAKE_ARP         = 1 << 4
+	WAKE_MAGIC       = 1 << 5
+	WAKE_MAGICSECURE = 1 << 6 // only meaningful if WAKE_MAGIC
+)
+
+var WoLMap = map[uint32]string{
+	WAKE_PHY:         "p", // Wake on PHY activity
+	WAKE_UCAST:       "u", // Wake on unicast messages
+	WAKE_MCAST:       "m", // Wake on multicast messages
+	WAKE_BCAST:       "b", // Wake on broadcast messages
+	WAKE_ARP:         "a", // Wake on ARP
+	WAKE_MAGIC:       "g", // Wake on MagicPacket™
+	WAKE_MAGICSECURE: "s", // Enable SecureOn™ password for MagicPacket™
+	// f Wake on filter(s)
+	// d Disable (wake on  nothing). This option clears all previous options.
+}
+
+// WakeOnLan contains WoL config for an interface
+type WakeOnLan struct {
+	Cmd       uint32 // ETHTOOL_GWOL or ETHTOOL_SWOL
+	Supported uint32 // r/o bitmask of WAKE_* flags for supported WoL modes
+	Opts      uint32 // Bitmask of WAKE_* flags for enabled WoL modes
 }
 
 const (
@@ -486,6 +518,31 @@ func (e *Ethtool) GetCoalesce(intf string) (Coalesce, error) {
 		return Coalesce{}, err
 	}
 	return coalesce, nil
+}
+
+// GetWakeOnLan returns the WoL config for the given interface name.
+func (e *Ethtool) GetWakeOnLan(intf string) (WakeOnLan, error) {
+	wol := WakeOnLan{
+		Cmd: ETHTOOL_GWOL,
+	}
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&wol))); err != nil {
+		return WakeOnLan{}, err
+	}
+
+	return wol, nil
+}
+
+// SetWakeOnLan sets the WoL config for the given interface name and
+// returns the new WoL config.
+func (e *Ethtool) SetWakeOnLan(intf string, wol WakeOnLan) (WakeOnLan, error) {
+	wol.Cmd = ETHTOOL_SWOL
+
+	if err := e.ioctl(intf, uintptr(unsafe.Pointer(&wol))); err != nil {
+		return WakeOnLan{}, err
+	}
+
+	return wol, nil
 }
 
 // GetTimestampingInformation returns the PTP timestamping information for the given interface name.
