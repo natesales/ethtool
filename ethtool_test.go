@@ -23,6 +23,7 @@ package ethtool
 
 import (
 	"net"
+	"reflect"
 	"testing"
 )
 
@@ -103,5 +104,64 @@ func TestBusInfo(t *testing.T) {
 
 	if !success {
 		t.Fatal("Unable to retrieve bus info from any interface of this system.")
+	}
+}
+
+func TestSupportedLinkModes(t *testing.T) {
+	var cases = []struct {
+		inputMask uint64
+		expected  []string
+	}{
+		{0b01100010_11101111, []string{"10baseT_Half", "10baseT_Full", "100baseT_Half", "100baseT_Full", "1000baseT_Full"}},
+	}
+
+	for _, testcase := range cases {
+		actual := SupportedLinkModes(testcase.inputMask)
+		if !reflect.DeepEqual(actual, testcase.expected) {
+			t.Error("Expected ", testcase.expected, " got ", actual)
+		}
+	}
+}
+
+func TestFeatures(t *testing.T) {
+	et, err := NewEthtool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer et.Close()
+
+	feats, err := et.Features("lo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(feats) == 0 {
+		// TOD0: do we have a sane subset of features we should check?
+		t.Fatalf("expected features for loopback interface")
+	}
+
+	featsWithState, err := et.FeaturesWithState("lo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(feats) != len(featsWithState) {
+		t.Fatalf("features mismatch: %d with state %d", len(feats), len(featsWithState))
+	}
+
+	fixed := 0
+	for key, val := range feats {
+		state, ok := featsWithState[key]
+		if !ok || val != state.Active {
+			t.Errorf("inconsistent feature: %q reported %v active %v", key, val, state.Active)
+		}
+		if !state.Available {
+			fixed++
+		}
+	}
+
+	if fixed == 0 {
+		// the lo interface MUST have some non-available features, by design
+		t.Fatalf("loopback interface reported all features available")
 	}
 }
