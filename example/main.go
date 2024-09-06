@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"git.cloudsmash.io/cloudsmash/ethtool"
+	"github.com/safchain/ethtool"
 )
 
 func main() {
